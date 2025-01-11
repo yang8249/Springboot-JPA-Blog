@@ -4,13 +4,17 @@ import java.util.List;
 import java.util.function.Supplier;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort.Direction;
 import org.springframework.data.web.PageableDefault;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -18,6 +22,7 @@ import com.example.demo.model.RoleType;
 import com.example.demo.model.Users;
 import com.example.demo.repository.UserRepository;
 
+import jakarta.transaction.Transactional;
 import net.bytebuddy.asm.Advice.OffsetMapping.Sort;
 
 @RestController
@@ -26,7 +31,44 @@ public class DummyControllerTest{
 	@Autowired // 얘가 의존성주입이다 (DI)
 	private UserRepository userRepository;
 	
+	//삭제 DAO
+	@DeleteMapping("/dummy/user/{id}")
+	public String delete(@PathVariable int id) {
+		try {			
+			//Delete작업은 예외처리를 해줘야 안전하다.
+			userRepository.deleteById(id);
+		} catch (EmptyResultDataAccessException e) {
+			return "삭제 오류가 발생했습니다.";
+		}
+		
+		return "삭제 되었습니다.";
+	}
+	
+	//Update DAO
+	//전달받을 매개변수 : Email, password
+	@Transactional //트랜잭션 어노테이션을 설정해줘야 save() 함수 없이 업데이트가 가능하다.
+	// 트랜색셔널을 설정해줘야 해당 메서드작업의 트랜잭션 처리를 시작한다는 뜻이다.
+	@PutMapping("/dummy/user/{id}")
+	public Users updateUser(@PathVariable int id, @RequestBody Users requestUser) {
+		// URL경로의 값 : id
+		// form태그에 들어있는 값 : email, password
+		
+		// 변경할 유저 id를 찾는다. (영속화 함.)
+		Users user = userRepository.findById(id).orElseThrow(()->{
+			return new IllegalArgumentException("수정에 실패하였습니다.");
+		});
+		
+		// 찾은 user 객체에 수정한 값을 set해준다.
+		// 영속화한 객체를 수정해서 트랜잭션이 커밋되면, DB와 영속컨테이너의 상태를 체크하여 update가 되어진다.
+		user.setEmail(requestUser.getEmail());
+		user.setPassword(requestUser.getPassword());
+		
+		// 변경된값을 보여줄필요 없으니 return은 null이다.
+		return null;
+	}
 
+
+	// 모든값 Select하기
 	@GetMapping("/dummy/user")
 	public List<Users> list() {
 		
